@@ -1,4 +1,4 @@
-# StepFlow Business Process Framework
+# Business Process Framework
 
 A lightweight saga orchestration framework for backend process flows.
 
@@ -69,9 +69,9 @@ REST execution request example:
 }
 ```
 
-`order-service` generates the internal `orderId`. The workflow passes `clientRequestId` to make create-order retry-safe and uses the generated `orderId` from the create-order response in later steps.
+`order-service` generates the internal `orderId`. The Business process passes `clientRequestId` to make create-order retry-safe and uses the generated `orderId` from the create-order response in later steps.
 
-The end-to-end order workflow does not execute notification steps. Customer contact lookup and conditional notifications can be added as a future enhancement.
+The end-to-end order process does not execute notification steps. Customer contact lookup and conditional notifications can be added as a future enhancement.
 
 Execution details can be fetched with:
 
