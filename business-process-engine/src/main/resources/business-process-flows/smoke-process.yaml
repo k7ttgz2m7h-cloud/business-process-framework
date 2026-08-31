@@ -1,0 +1,14 @@
+businessProcessName: smoke-order-bp
+version: "1.0"
+stepName: Smoke Order Flow
+steps:
+  - stepNumber: 1
+    stepName: create-order-step
+    providerName: order-service
+    tasks:
+      - taskOrder: 1
+        taskName: create-order
+        taskType: HTTP
+        taskConfig:
+          endpoint: /api/orders
+          method: POST

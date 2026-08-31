@@ -1,0 +1,62 @@
+registry:
+  services:
+    - name: order-service
+      host: localhost
+      port: 8081
+      healthPath: /actuator/health
+      protocol: http
+      timeoutMs: 2000
+    - name: payment-service
+      host: localhost
+      port: 8082
+      healthPath: /actuator/health
+      protocol: http
+      timeoutMs: 2000
+    - name: customer-service
+      host: localhost
+      port: 8083
+      healthPath: /actuator/health
+      protocol: http
+      timeoutMs: 2000
+    - name: inventory-service
+      host: localhost
+      port: 8084
+      healthPath: /actuator/health
+      protocol: http
+      timeoutMs: 2000
+    - name: pricing-service
+      host: localhost
+      port: 8085
+      healthPath: /actuator/health
+      protocol: http
+      timeoutMs: 2000
+    - name: fraud-service
+      host: localhost
+      port: 8086
+      healthPath: /actuator/health
+      protocol: http
+      timeoutMs: 2000
+    - name: fulfillment-service
+      host: localhost
+      port: 8087
+      healthPath: /actuator/health
+      protocol: http
+      timeoutMs: 2000
+    - name: shipping-service
+      host: localhost
+      port: 8088
+      healthPath: /actuator/health
+      protocol: http
+      timeoutMs: 2000
+    - name: notification-service
+      host: localhost
+      port: 8089
+      healthPath: /actuator/health
+      protocol: http
+      timeoutMs: 2000
+    - name: business-process-app
+      host: localhost
+      port: 8080
+      healthPath: /actuator/health
+      protocol: http
+      timeoutMs: 2000

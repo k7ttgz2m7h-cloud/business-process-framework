@@ -1,0 +1,92 @@
+businessProcessName: sample-order-bp
+version: "1.0"
+steps:
+  - stepNumber: 1
+    stepName: create-order
+    providerName: order-service
+    tasks:
+      - taskOrder: 1
+        taskName: create-order
+        taskType: HTTP
+        taskConfig:
+          endpoint: /api/orders
+          method: POST
+        requestPayload:
+          payload:
+            clientRequestId: $.initialPayload.clientRequestId
+            customerId: $.initialPayload.customerId
+    compensation:
+      stepNumber: 1
+      stepName: compensate-create-order
+      providerName: order-service
+      tasks:
+        - taskOrder: 1
+          taskName: cancel-order
+          taskType: HTTP
+          taskConfig:
+            endpoint: /api/orders/cancel
+            method: POST
+          requestPayload:
+            payload:
+              orderId: $.steps[0].tasks[0].responsePayload.orderId
+              reason: BusinessProcess compensation
+
+  - stepNumber: 2
+    stepName: process-payment
+    providerName: payment-service
+    tasks:
+      - taskOrder: 1
+        taskName: authorize-payment
+        taskType: HTTP
+        taskConfig:
+          endpoint: /api/payments/authorize
+          method: POST
+        requestPayload:
+          payload:
+            orderId: $.steps[0].tasks[0].responsePayload.orderId
+            amount: $.initialPayload.amount
+    compensation:
+      stepNumber: 1
+      stepName: compensate-process-payment
+      providerName: payment-service
+      tasks:
+        - taskOrder: 1
+          taskName: refund-payment
+          taskType: HTTP
+          taskConfig:
+            endpoint: /api/payments/authorizations/void
+            method: POST
+          requestPayload:
+            payload:
+              orderId: $.steps[0].tasks[0].responsePayload.orderId
+              authorizationId: $.steps[1].tasks[0].responsePayload.authorizationId
+
+  - stepNumber: 3
+    stepName: check-inventory
+    providerName: inventory-service
+    tasks:
+      - taskOrder: 1
+        taskName: reserve-inventory
+        taskType: HTTP
+        taskConfig:
+          endpoint: /api/inventory/reservations
+          method: POST
+        requestPayload:
+          payload:
+            orderId: $.steps[0].tasks[0].responsePayload.orderId
+            items: $.initialPayload.items
+    compensation:
+      stepNumber: 1
+      stepName: compensate-check-inventory
+      providerName: inventory-service
+      tasks:
+        - taskOrder: 1
+          taskName: release-inventory
+          taskType: HTTP
+          taskConfig:
+            endpoint: /api/inventory/reservations/{reservationId}
+            method: DELETE
+          requestPayload:
+            payload:
+              reservationId: $.steps[2].tasks[0].responsePayload.reservationId
+              orderId: $.steps[0].tasks[0].responsePayload.orderId

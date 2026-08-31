@@ -1,0 +1,74 @@
+businessProcessName: notification-flow-bp
+version: "1.0"
+steps:
+  - stepNumber: 1
+    stepName: send-email-notification
+    providerName: notification-service
+    failurePolicy:
+      action: CONTINUE
+      retryable: true
+    tasks:
+      - taskOrder: 1
+        taskName: send-email-notification
+        taskType: HTTP
+        taskConfig:
+          endpoint: /api/notifications/send
+          method: POST
+        requestPayload:
+          payload:
+            orderId: $.initialPayload.orderId
+            customerId: $.initialPayload.customerId
+            phase: $.initialPayload.phase
+            mode: EMAIL
+            emailIds: $.initialPayload.emailIds
+            phoneNumbers: $.initialPayload.phoneNumbers
+            subject: $.initialPayload.subject
+            message: $.initialPayload.message
+
+  - stepNumber: 2
+    stepName: send-sms-notification
+    providerName: notification-service
+    failurePolicy:
+      action: CONTINUE
+      retryable: true
+    tasks:
+      - taskOrder: 1
+        taskName: send-sms-notification
+        taskType: HTTP
+        taskConfig:
+          endpoint: /api/notifications/send
+          method: POST
+        requestPayload:
+          payload:
+            orderId: $.initialPayload.orderId
+            customerId: $.initialPayload.customerId
+            phase: $.initialPayload.phase
+            mode: SMS
+            emailIds: $.initialPayload.emailIds
+            phoneNumbers: $.initialPayload.phoneNumbers
+            subject: $.initialPayload.subject
+            message: $.initialPayload.message
+
+  - stepNumber: 3
+    stepName: send-push-notification
+    providerName: notification-service
+    failurePolicy:
+      action: CONTINUE
+      retryable: true
+    tasks:
+      - taskOrder: 1
+        taskName: send-push-notification
+        taskType: HTTP
+        taskConfig:
+          endpoint: /api/notifications/send
+          method: POST
+        requestPayload:
+          payload:
+            orderId: $.initialPayload.orderId
+            customerId: $.initialPayload.customerId
+            phase: $.initialPayload.phase
+            mode: PUSH
+            emailIds: $.initialPayload.emailIds
+            phoneNumbers: $.initialPayload.phoneNumbers
+            subject: $.initialPayload.subject
+            message: $.initialPayload.message

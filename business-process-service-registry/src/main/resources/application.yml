@@ -1,0 +1,21 @@
+spring:
+  application:
+    name: business-process-service-registry
+  config:
+    import: classpath:services-registry.yml
+
+server:
+  port: 8090
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+business-process-service-registry:
+  check-interval-ms: 10000
+
+logging:
+  level:
+    com.businessprocess.businessprocessserviceregistry: INFO
