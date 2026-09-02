@@ -79,6 +79,12 @@ Execution details can be fetched with:
 - `GET /api/businessprocessflow/{executionId}`
 - `GET /api/businessprocessflow/{executionId}/metrics`
 
+A business-safe process summary, including all steps and their tasks, can be fetched by correlation ID:
+
+- `GET /api/businessprocesses/correlations/{correlationId}`
+
+The summary maps completed work to `PASSED`, active work to `IN_PROGRESS`, and failed or compensated work to `FAILED`. It does not expose execution IDs or request and response payloads.
+
 Kafka trigger message example:
 
 ```json

@@ -197,6 +197,21 @@ public class BusinessProcessPersistenceService {
                         "Business process execution not found for process name '" + businessProcessName
                                 + "' and correlation id '" + correlationId + "'"));
 
+        return toExecutionDetails(execution);
+    }
+
+    @Transactional(readOnly = true)
+    public BusinessProcessExecutionDetails getBusinessProcessExecutionDetails(String correlationId) {
+        BusinessProcessExecutionEntity execution = businessProcessExecutionRepository
+                .findByCorrelationId(correlationId)
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "Business process execution not found for correlation id '" + correlationId + "'"));
+
+        return toExecutionDetails(execution);
+    }
+
+    private BusinessProcessExecutionDetails toExecutionDetails(BusinessProcessExecutionEntity execution) {
+
         List<BusinessProcessTaskEntity> tasks = businessProcessTaskRepository
                 .findByExecutionExecutionIdOrderByStepIdAscTaskOrderAsc(execution.getExecutionId());
         Map<String, List<BusinessProcessTaskEntity>> tasksByStepId = tasks.stream()
