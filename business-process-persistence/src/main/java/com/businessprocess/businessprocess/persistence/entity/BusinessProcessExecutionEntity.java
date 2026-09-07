@@ -23,7 +23,8 @@ import java.time.LocalDateTime;
         name = "business_process_execution",
         uniqueConstraints = @UniqueConstraint(name = "uk_business_process_execution_correlation", columnNames = {"business_process_name", "correlation_id"}),
         indexes = {
-                @Index(name = "idx_business_process_execution_name", columnList = "business_process_name")
+                @Index(name = "idx_business_process_execution_name", columnList = "business_process_name"),
+                @Index(name = "idx_business_process_execution_failure", columnList = "status, failure_type, completed_at")
         }
 )
 public class BusinessProcessExecutionEntity {
@@ -43,6 +44,9 @@ public class BusinessProcessExecutionEntity {
 
     @Column(name = "status", nullable = false, length = 40)
     private String status;
+
+    @Column(name = "failure_type", length = 40)
+    private String failureType;
 
     @Lob
     @Column(name = "input_payload")

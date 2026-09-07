@@ -38,16 +38,16 @@ public class BusinessProcessTaskEntity {
     @JoinColumn(name = "execution_id", nullable = false)
     private BusinessProcessExecutionEntity execution;
 
-    @Column(name = "execution_id", nullable = false, length = 80, insertable = false, updatable = false)
+    @Column(name = "execution_id", nullable = false, length = 160, insertable = false, updatable = false)
     private String executionId;
 
     @Column(name = "correlation_id", nullable = false, length = 160)
     private String correlationId;
 
-    @Column(name = "step_id", nullable = false, length = 120)
+    @Column(name = "step_id", nullable = false, length = 160)
     private String stepId;
 
-    @Column(name = "task_id", nullable = false, length = 120)
+    @Column(name = "task_id", nullable = false, length = 160)
     private String taskId;
 
     @Column(name = "task_order")
@@ -58,6 +58,9 @@ public class BusinessProcessTaskEntity {
 
     @Column(name = "status", nullable = false, length = 40)
     private String status;
+
+    @Column(name = "failure_type", length = 40)
+    private String failureType;
 
     @Lob
     @Column(name = "input_payload")

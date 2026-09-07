@@ -9,6 +9,7 @@ import com.businessprocess.core.model.task.Task;
 import com.businessprocess.core.model.task.TaskStatus;
 import com.businessprocess.core.model.businessprocess.BusinessProcessStep;
 import com.businessprocess.core.model.businessprocess.BusinessProcessStepStatus;
+import com.businessprocess.core.policy.FailureType;
 import com.businessprocess.engine.engine.BusinessProcessExecution;
 import com.businessprocess.engine.model.BusinessProcessDefinition;
 import com.businessprocess.businessprocess.persistence.entity.BusinessProcessDefinitionEntity;
@@ -21,6 +22,9 @@ import com.businessprocess.businessprocess.persistence.repository.BusinessProces
 import com.businessprocess.businessprocess.persistence.repository.BusinessProcessTaskRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.io.ClassPathResource;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -139,6 +143,7 @@ public class BusinessProcessPersistenceService {
         entity.setBusinessProcessName(processKey);
         entity.setCorrelationId(correlationId != null ? correlationId : execution.getProcessId());
         entity.setStatus(execution.getStatus().name());
+        entity.setFailureType(resolveExecutionFailureType(execution));
         entity.setErrorMessage(execution.getError());
         entity.setCompensationStatus(execution.getCompensationStatus());
         entity.setCompensationError(execution.getCompensationError());
@@ -174,6 +179,7 @@ public class BusinessProcessPersistenceService {
                 taskEntity.setTaskOrder(resolveTaskOrder(task));
                 taskEntity.setTaskName(task.getTaskName());
                 taskEntity.setStatus(resolveTaskStatus(task));
+                taskEntity.setFailureType(task.getFailureType() != null ? task.getFailureType().name() : null);
                 taskEntity.setInputPayload(writePayload(task.getRequestPayload()));
                 taskEntity.setOutputPayload(writePayload(task.getResponsePayload()));
                 taskEntity.setErrorMessage(task.getError());
@@ -210,6 +216,33 @@ public class BusinessProcessPersistenceService {
         return toExecutionDetails(execution);
     }
 
+    @Transactional(readOnly = true)
+    public Page<BusinessProcessExecutionDetails> searchFailedBusinessProcessExecutions(
+            String businessProcessName,
+            List<FailureType> failureTypes,
+            Pageable pageable
+    ) {
+        Specification<BusinessProcessExecutionEntity> specification =
+                (root, query, criteriaBuilder) -> root.get("status").in(
+                        "FAILED", "FAILED_COMPENSATED", "FAILED_COMPENSATION_FAILED");
+
+        if (businessProcessName != null && !businessProcessName.isBlank()) {
+            specification = specification.and((root, query, criteriaBuilder) ->
+                    criteriaBuilder.equal(root.get("businessProcessName"), businessProcessName));
+        }
+        if (failureTypes != null && !failureTypes.isEmpty()) {
+            List<String> names = failureTypes.stream().map(Enum::name).toList();
+            specification = specification.and((root, query, criteriaBuilder) -> {
+                var matchingTypes = root.get("failureType").in(names);
+                return failureTypes.contains(FailureType.UNKNOWN)
+                        ? criteriaBuilder.or(matchingTypes, criteriaBuilder.isNull(root.get("failureType")))
+                        : matchingTypes;
+            });
+        }
+
+        return businessProcessExecutionRepository.findAll(specification, pageable).map(this::toExecutionDetails);
+    }
+
     private BusinessProcessExecutionDetails toExecutionDetails(BusinessProcessExecutionEntity execution) {
 
         List<BusinessProcessTaskEntity> tasks = businessProcessTaskRepository
@@ -228,6 +261,7 @@ public class BusinessProcessPersistenceService {
                 .businessProcessName(execution.getBusinessProcessName())
                 .correlationId(execution.getCorrelationId())
                 .status(execution.getStatus())
+                .failureType(execution.getFailureType())
                 .inputPayload(readPayload(execution.getInputPayload()))
                 .outputPayload(readPayload(execution.getOutputPayload()))
                 .errorMessage(execution.getErrorMessage())
@@ -267,6 +301,7 @@ public class BusinessProcessPersistenceService {
                 .taskOrder(task.getTaskOrder())
                 .taskName(task.getTaskName())
                 .status(task.getStatus())
+                .failureType(task.getFailureType())
                 .inputPayload(readPayload(task.getInputPayload()))
                 .outputPayload(readPayload(task.getOutputPayload()))
                 .errorMessage(task.getErrorMessage())
@@ -359,6 +394,25 @@ public class BusinessProcessPersistenceService {
         return task.getStatus() != null ? task.getStatus().name() : TaskStatus.CREATED.name();
     }
 
+    private String resolveExecutionFailureType(BusinessProcessExecution execution) {
+        if (execution.getStatus() == null
+                || !execution.getStatus().name().startsWith("FAILED")
+                || execution.getContext() == null
+                || execution.getContext().getBusinessProcess() == null
+                || execution.getContext().getBusinessProcess().getSteps() == null) {
+            return null;
+        }
+        return execution.getContext().getBusinessProcess().getSteps().stream()
+                .filter(step -> step.getTasks() != null)
+                .flatMap(step -> step.getTasks().stream())
+                .filter(task -> task.getStatus() == TaskStatus.FAILED)
+                .map(Task::getFailureType)
+                .filter(java.util.Objects::nonNull)
+                .findFirst()
+                .orElse(FailureType.UNKNOWN)
+                .name();
+    }
+
     private String writePayload(BasePayload payload) {
         if (payload == null) {
             return null;
@@ -389,6 +443,7 @@ public class BusinessProcessPersistenceService {
         private String businessProcessName;
         private String correlationId;
         private String status;
+        private String failureType;
         private Object inputPayload;
         private Object outputPayload;
         private String errorMessage;
@@ -423,6 +478,7 @@ public class BusinessProcessPersistenceService {
         private Integer taskOrder;
         private String taskName;
         private String status;
+        private String failureType;
         private Object inputPayload;
         private Object outputPayload;
         private String errorMessage;
