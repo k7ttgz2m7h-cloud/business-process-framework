@@ -1,7 +1,9 @@
 package com.businessprocess.businessprocess.api.mapper;
 
+import com.businessprocess.businessprocess.persistence.model.BusinessProcessExecutionDetails;
+import com.businessprocess.businessprocess.persistence.model.BusinessProcessStepDetails;
+import com.businessprocess.businessprocess.persistence.model.BusinessProcessTaskDetails;
 import com.businessprocess.businessprocess.api.dto.FailedBusinessProcessSearchResponse;
-import com.businessprocess.businessprocess.persistence.service.BusinessProcessPersistenceService;
 import com.businessprocess.core.policy.FailureType;
 import org.springframework.data.domain.Page;
 import org.springframework.stereotype.Component;
@@ -10,7 +12,7 @@ import org.springframework.stereotype.Component;
 public class FailedBusinessProcessMapper {
 
     public FailedBusinessProcessSearchResponse toResponse(
-            Page<BusinessProcessPersistenceService.BusinessProcessExecutionDetails> executions
+            Page<BusinessProcessExecutionDetails> executions
     ) {
         return FailedBusinessProcessSearchResponse.builder()
                 .items(executions.getContent().stream().map(this::toFailedExecution).toList())
@@ -22,7 +24,7 @@ public class FailedBusinessProcessMapper {
     }
 
     private FailedBusinessProcessSearchResponse.FailedExecution toFailedExecution(
-            BusinessProcessPersistenceService.BusinessProcessExecutionDetails execution
+            BusinessProcessExecutionDetails execution
     ) {
         var failedStep = execution.getSteps().stream()
                 .filter(step -> "FAILED".equals(step.getStatus()))
@@ -65,7 +67,7 @@ public class FailedBusinessProcessMapper {
 
     private FailureType resolveFailureType(
             String executionFailureType,
-            BusinessProcessPersistenceService.BusinessProcessTaskDetails failedTask
+            BusinessProcessTaskDetails failedTask
     ) {
         String value = failedTask != null && failedTask.getFailureType() != null
                 ? failedTask.getFailureType()
@@ -74,9 +76,9 @@ public class FailedBusinessProcessMapper {
     }
 
     private String resolveFailureReason(
-            BusinessProcessPersistenceService.BusinessProcessExecutionDetails execution,
-            BusinessProcessPersistenceService.BusinessProcessStepDetails failedStep,
-            BusinessProcessPersistenceService.BusinessProcessTaskDetails failedTask
+            BusinessProcessExecutionDetails execution,
+            BusinessProcessStepDetails failedStep,
+            BusinessProcessTaskDetails failedTask
     ) {
         if (failedTask != null && failedTask.getErrorMessage() != null) {
             return failedTask.getErrorMessage();

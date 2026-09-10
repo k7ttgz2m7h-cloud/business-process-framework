@@ -1,5 +1,8 @@
 package com.businessprocess.businessprocess.api.controller;
 
+import com.businessprocess.businessprocess.persistence.model.BusinessProcessExecutionDetails;
+import com.businessprocess.businessprocess.persistence.model.BusinessProcessStepDetails;
+import com.businessprocess.businessprocess.persistence.model.BusinessProcessTaskDetails;
 import com.businessprocess.businessprocess.api.dto.BusinessProcessExecutionRequest;
 import com.businessprocess.businessprocess.api.dto.BusinessProcessExecutionDetailsResponse;
 import com.businessprocess.businessprocess.api.dto.BusinessProcessExecutionDetailsRequest;
@@ -125,7 +128,7 @@ public class BusinessProcessController {
     }
 
     private BusinessProcessExecutionDetailsResponse toResponse(
-            BusinessProcessPersistenceService.BusinessProcessExecutionDetails details
+            BusinessProcessExecutionDetails details
     ) {
         return BusinessProcessExecutionDetailsResponse.builder()
                 .executionId(details.getExecutionId())
@@ -147,7 +150,7 @@ public class BusinessProcessController {
     }
 
     private BusinessProcessExecutionDetailsResponse.StepDetails toStepResponse(
-            BusinessProcessPersistenceService.BusinessProcessStepDetails step
+            BusinessProcessStepDetails step
     ) {
         return BusinessProcessExecutionDetailsResponse.StepDetails.builder()
                 .stepId(step.getStepId())
@@ -167,7 +170,7 @@ public class BusinessProcessController {
     }
 
     private BusinessProcessExecutionDetailsResponse.TaskDetails toTaskResponse(
-            BusinessProcessPersistenceService.BusinessProcessTaskDetails task
+            BusinessProcessTaskDetails task
     ) {
         return BusinessProcessExecutionDetailsResponse.TaskDetails.builder()
                 .taskId(task.getTaskId())

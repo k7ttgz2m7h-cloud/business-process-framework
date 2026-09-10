@@ -1,5 +1,8 @@
 package com.businessprocess.businessprocess.persistence.service;
 
+import com.businessprocess.businessprocess.persistence.model.BusinessProcessExecutionDetails;
+import com.businessprocess.businessprocess.persistence.model.BusinessProcessStepDetails;
+import com.businessprocess.businessprocess.persistence.model.BusinessProcessTaskDetails;
 import tools.jackson.core.JacksonException;
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.ObjectMapper;
@@ -47,7 +50,6 @@ public class BusinessProcessPersistenceService {
     private final BusinessProcessStepRepository businessProcessStepRepository;
     private final BusinessProcessTaskRepository businessProcessTaskRepository;
     private final ObjectMapper objectMapper;
-
 
     public BusinessProcessPersistenceService(
             BusinessProcessDefinitionRepository businessProcessDefinitionRepository,
@@ -436,56 +438,7 @@ public class BusinessProcessPersistenceService {
         }
     }
 
-    @lombok.Data
-    @lombok.Builder
-    public static class BusinessProcessExecutionDetails {
-        private String executionId;
-        private String businessProcessName;
-        private String correlationId;
-        private String status;
-        private String failureType;
-        private Object inputPayload;
-        private Object outputPayload;
-        private String errorMessage;
-        private String compensationStatus;
-        private String compensationError;
-        private LocalDateTime startedAt;
-        private LocalDateTime completedAt;
-        private Long durationMs;
-        private List<BusinessProcessStepDetails> steps;
-    }
 
-    @lombok.Data
-    @lombok.Builder
-    public static class BusinessProcessStepDetails {
-        private String stepId;
-        private Integer stepNumber;
-        private String stepName;
-        private String status;
-        private Object inputPayload;
-        private Object outputPayload;
-        private String errorMessage;
-        private LocalDateTime startedAt;
-        private LocalDateTime completedAt;
-        private Long durationMs;
-        private List<BusinessProcessTaskDetails> tasks;
-    }
-
-    @lombok.Data
-    @lombok.Builder
-    public static class BusinessProcessTaskDetails {
-        private String taskId;
-        private Integer taskOrder;
-        private String taskName;
-        private String status;
-        private String failureType;
-        private Object inputPayload;
-        private Object outputPayload;
-        private String errorMessage;
-        private LocalDateTime startedAt;
-        private LocalDateTime completedAt;
-        private Long durationMs;
-    }
 
     private String readBusinessProcessSource(String businessProcessPath) {
         if (businessProcessPath == null || businessProcessPath.isBlank()) {

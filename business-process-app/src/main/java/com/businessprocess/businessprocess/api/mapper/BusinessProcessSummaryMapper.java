@@ -1,8 +1,8 @@
 package com.businessprocess.businessprocess.api.mapper;
 
+import com.businessprocess.businessprocess.persistence.model.BusinessProcessExecutionDetails;
 import com.businessprocess.businessprocess.api.dto.BusinessProcessSummaryResponse;
 import com.businessprocess.businessprocess.api.dto.BusinessProcessSummaryResponse.BusinessStatus;
-import com.businessprocess.businessprocess.persistence.service.BusinessProcessPersistenceService;
 import org.springframework.stereotype.Component;
 
 import java.util.Locale;
@@ -11,7 +11,7 @@ import java.util.Locale;
 public class BusinessProcessSummaryMapper {
 
     public BusinessProcessSummaryResponse toResponse(
-            BusinessProcessPersistenceService.BusinessProcessExecutionDetails details
+            BusinessProcessExecutionDetails details
     ) {
         return BusinessProcessSummaryResponse.builder()
                 .correlationId(details.getCorrelationId())
