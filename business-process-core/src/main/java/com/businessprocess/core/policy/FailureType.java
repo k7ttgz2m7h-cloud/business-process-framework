@@ -15,8 +15,9 @@ public enum FailureType {
             case 400, 402, 404, 406, 410, 412, 413, 416, 422, 428, 451 -> BUSINESS_FAILURE;
             case 401, 403, 407, 511 -> AUTH_FAILURE;
             case 409, 423 -> CONFLICT;
-            case 405, 408, 411, 414, 415, 417, 421, 424, 425, 426, 429, 431 -> TECHNICAL_FAILURE;
-            case 500, 501, 502, 503, 504, 505, 506, 507, 508, 510 -> TECHNICAL_FAILURE;
+            case 405, 408, 411, 414, 415, 417, 421, 424, 425, 426,
+                 429, 431, 500, 501, 502, 503, 504, 505, 506, 507,
+                 508, 510 -> TECHNICAL_FAILURE;
             default -> UNKNOWN;
         };
     }

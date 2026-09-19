@@ -1,0 +1,282 @@
+businessProcessName: compact-order-bp
+version: "1.0"
+steps:
+  - stepNumber: 1
+    stepName: create-order
+    providerName: order-service
+    failurePolicy:
+      action: COMPENSATE_AND_STOP
+      retryable: true
+    tasks:
+      - taskOrder: 1
+        taskName: create-order
+        taskType: HTTP
+        taskConfig:
+          endpoint: /api/orders
+          method: POST
+        requestPayload:
+          payload:
+            clientRequestId: $.initialPayload.clientRequestId
+            customerId: $.initialPayload.customerId
+    compensation:
+      stepNumber: 1
+      stepName: compensate-create-order
+      providerName: order-service
+      tasks:
+        - taskOrder: 1
+          taskName: cancel-order
+          taskType: HTTP
+          taskConfig:
+            endpoint: /api/orders/cancel
+            method: POST
+          requestPayload:
+            payload:
+              orderId: $.steps[0].tasks[0].responsePayload.orderId
+              reason: BusinessProcess compensation
+  - stepNumber: 2
+    stepName: verify-customer
+    providerName: customer-service
+    tasks:
+      - taskOrder: 1
+        taskName: get-customer
+        taskType: HTTP
+        taskConfig:
+          endpoint: /api/customers/{customerId}
+          method: GET
+        requestPayload:
+          payload:
+            customerId: $.initialPayload.customerId
+      - taskOrder: 2
+        taskName: verify-customer
+        taskType: HTTP
+        taskConfig:
+          endpoint: /api/customers/verify
+          method: POST
+        requestPayload:
+          payload:
+            customerId: $.steps[1].tasks[0].responsePayload.customerId
+            orderId: $.steps[0].tasks[0].responsePayload.orderId
+            status: $.steps[1].tasks[0].responsePayload.status
+  - stepNumber: 3
+    stepName: reserve-inventory
+    providerName: inventory-service
+    failurePolicy:
+      action: COMPENSATE_AND_STOP
+      retryable: true
+    tasks:
+      - taskOrder: 1
+        taskName: reserve-inventory
+        taskType: HTTP
+        taskConfig:
+          endpoint: /api/inventory/reservations
+          method: POST
+        requestPayload:
+          payload:
+            orderId: $.steps[0].tasks[0].responsePayload.orderId
+            items: $.initialPayload.items
+    compensation:
+      stepNumber: 1
+      stepName: compensate-reserve-inventory
+      providerName: inventory-service
+      tasks:
+        - taskOrder: 1
+          taskName: release-inventory
+          taskType: HTTP
+          taskConfig:
+            endpoint: /api/inventory/reservations/{reservationId}/release
+            method: POST
+          requestPayload:
+            payload:
+              reservationId: $.steps[2].tasks[0].responsePayload.reservationId
+              orderId: $.steps[0].tasks[0].responsePayload.orderId
+  - stepNumber: 4
+    stepName: price-order
+    providerName: pricing-service
+    tasks:
+      - taskOrder: 1
+        taskName: get-price-book
+        taskType: HTTP
+        taskConfig:
+          endpoint: /api/pricing/price-books/{priceBookId}
+          method: GET
+        requestPayload:
+          payload:
+            priceBookId: $.initialPayload.priceBookId
+      - taskOrder: 2
+        taskName: calculate-price
+        taskType: HTTP
+        taskConfig:
+          endpoint: /api/pricing/calculate
+          method: POST
+        requestPayload:
+          payload:
+            orderId: $.steps[0].tasks[0].responsePayload.orderId
+            items: $.initialPayload.items
+  - stepNumber: 5
+    stepName: authorize-payment
+    providerName: payment-service
+    failurePolicy:
+      action: COMPENSATE_AND_STOP
+      retryable: true
+    tasks:
+      - taskOrder: 1
+        taskName: authorize-payment
+        taskType: HTTP
+        taskConfig:
+          endpoint: /api/payments/authorize
+          method: POST
+        requestPayload:
+          payload:
+            orderId: $.steps[0].tasks[0].responsePayload.orderId
+            amount: $.steps[3].tasks[1].responsePayload.totalAmount
+    compensation:
+      stepNumber: 1
+      stepName: compensate-authorize-payment
+      providerName: payment-service
+      tasks:
+        - taskOrder: 1
+          taskName: void-authorization
+          taskType: HTTP
+          taskConfig:
+            endpoint: /api/payments/authorizations/void
+            method: POST
+          requestPayload:
+            payload:
+              authorizationId: $.steps[4].tasks[0].responsePayload.authorizationId
+              orderId: $.steps[0].tasks[0].responsePayload.orderId
+  - stepNumber: 6
+    stepName: fraud-screening
+    providerName: fraud-service
+    tasks:
+      - taskOrder: 1
+        taskName: screen-order
+        taskType: HTTP
+        taskConfig:
+          endpoint: /api/fraud/screen
+          method: POST
+        requestPayload:
+          payload:
+            orderId: $.steps[0].tasks[0].responsePayload.orderId
+            customerId: $.initialPayload.customerId
+            totalAmount: $.steps[3].tasks[1].responsePayload.totalAmount
+  - stepNumber: 7
+    stepName: fulfill-order
+    providerName: fulfillment-service
+    failurePolicy:
+      action: COMPENSATE_AND_STOP
+      retryable: true
+    tasks:
+      - taskOrder: 1
+        taskName: create-fulfillment
+        taskType: HTTP
+        taskConfig:
+          endpoint: /api/fulfillment/requests
+          method: POST
+        requestPayload:
+          payload:
+            orderId: $.steps[0].tasks[0].responsePayload.orderId
+            reservationId: $.steps[2].tasks[0].responsePayload.reservationId
+    compensation:
+      stepNumber: 1
+      stepName: compensate-fulfill-order
+      providerName: fulfillment-service
+      tasks:
+        - taskOrder: 1
+          taskName: cancel-fulfillment
+          taskType: HTTP
+          taskConfig:
+            endpoint: /api/fulfillment/requests/{fulfillmentId}/cancel
+            method: POST
+          requestPayload:
+            payload:
+              fulfillmentId: $.steps[6].tasks[0].responsePayload.fulfillmentId
+              orderId: $.steps[0].tasks[0].responsePayload.orderId
+  - stepNumber: 8
+    stepName: arrange-shipment
+    providerName: shipping-service
+    failurePolicy:
+      action: COMPENSATE_AND_STOP
+      retryable: true
+    tasks:
+      - taskOrder: 1
+        taskName: get-shipping-options
+        taskType: HTTP
+        taskConfig:
+          endpoint: /api/shipments/options
+          method: GET
+      - taskOrder: 2
+        taskName: create-shipment
+        taskType: HTTP
+        taskConfig:
+          endpoint: /api/shipments
+          method: POST
+        requestPayload:
+          payload:
+            orderId: $.steps[0].tasks[0].responsePayload.orderId
+            fulfillmentId: $.steps[6].tasks[0].responsePayload.fulfillmentId
+            carrierCode: $.steps[7].tasks[0].responsePayload.recommendedCarrierCode
+            serviceLevel: $.steps[7].tasks[0].responsePayload.recommendedServiceLevel
+    compensation:
+      stepNumber: 1
+      stepName: compensate-arrange-shipment
+      providerName: shipping-service
+      tasks:
+        - taskOrder: 1
+          taskName: cancel-shipment
+          taskType: HTTP
+          taskConfig:
+            endpoint: /api/shipments/{shipmentId}/cancel
+            method: POST
+          requestPayload:
+            payload:
+              shipmentId: $.steps[7].tasks[1].responsePayload.shipmentId
+              orderId: $.steps[0].tasks[0].responsePayload.orderId
+  - stepNumber: 9
+    stepName: capture-payment
+    providerName: payment-service
+    failurePolicy:
+      action: COMPENSATE_AND_STOP
+      retryable: true
+    tasks:
+      - taskOrder: 1
+        taskName: capture-payment
+        taskType: HTTP
+        taskConfig:
+          endpoint: /api/payments/capture
+          method: POST
+        requestPayload:
+          payload:
+            orderId: $.steps[0].tasks[0].responsePayload.orderId
+            authorizationId: $.steps[4].tasks[0].responsePayload.authorizationId
+            amount: $.steps[3].tasks[1].responsePayload.totalAmount
+    compensation:
+      stepNumber: 1
+      stepName: compensate-capture-payment
+      providerName: payment-service
+      tasks:
+        - taskOrder: 1
+          taskName: refund-payment
+          taskType: HTTP
+          taskConfig:
+            endpoint: /api/payments/refund
+            method: POST
+          requestPayload:
+            payload:
+              captureId: $.steps[8].tasks[0].responsePayload.captureId
+              orderId: $.steps[0].tasks[0].responsePayload.orderId
+              amount: $.steps[3].tasks[1].responsePayload.totalAmount
+  - stepNumber: 10
+    stepName: complete-order
+    providerName: order-service
+    tasks:
+      - taskOrder: 1
+        taskName: complete-order
+        taskType: HTTP
+        taskConfig:
+          endpoint: /api/orders/complete
+          method: POST
+        requestPayload:
+          payload:
+            orderId: $.steps[0].tasks[0].responsePayload.orderId
+            paymentCaptureId: $.steps[8].tasks[0].responsePayload.captureId
+            shipmentId: $.steps[7].tasks[1].responsePayload.shipmentId

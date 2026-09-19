@@ -2,7 +2,7 @@ package com.businessprocess.businessprocess.api.controller;
 
 import com.businessprocess.businessprocess.api.dto.BusinessProcessSummaryResponse;
 import com.businessprocess.businessprocess.api.mapper.BusinessProcessSummaryMapper;
-import com.businessprocess.businessprocess.persistence.service.BusinessProcessPersistenceService;
+import com.businessprocess.businessprocess.persistence.service.BusinessProcessExecutionQuery;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -15,14 +15,14 @@ import org.springframework.web.bind.annotation.RestController;
 @Slf4j
 public class BusinessProcessSummaryController {
 
-    private final BusinessProcessPersistenceService persistenceService;
+    private final BusinessProcessExecutionQuery executionQuery;
     private final BusinessProcessSummaryMapper summaryMapper;
 
     public BusinessProcessSummaryController(
-            BusinessProcessPersistenceService persistenceService,
+            BusinessProcessExecutionQuery executionQuery,
             BusinessProcessSummaryMapper summaryMapper
     ) {
-        this.persistenceService = persistenceService;
+        this.executionQuery = executionQuery;
         this.summaryMapper = summaryMapper;
     }
 
@@ -33,7 +33,7 @@ public class BusinessProcessSummaryController {
         log.info("Fetching business process summary for correlationId: {}", correlationId);
         try {
             return ResponseEntity.ok(summaryMapper.toResponse(
-                    persistenceService.getBusinessProcessExecutionDetails(correlationId)));
+                    executionQuery.getDetails(correlationId)));
         } catch (IllegalArgumentException exception) {
             return ResponseEntity.notFound().build();
         }

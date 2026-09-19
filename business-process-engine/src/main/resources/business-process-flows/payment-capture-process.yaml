@@ -1,0 +1,124 @@
+businessProcessName: payment-capture-bp
+version: "1.0"
+steps:
+  - stepNumber: 1
+    stepName: create-order
+    providerName: order-service
+    failurePolicy:
+      action: COMPENSATE_AND_STOP
+      retryable: true
+    tasks:
+      - taskOrder: 1
+        taskName: create-order
+        taskType: HTTP
+        taskConfig:
+          endpoint: /api/orders
+          method: POST
+        requestPayload:
+          payload:
+            clientRequestId: $.initialPayload.clientRequestId
+            customerId: $.initialPayload.customerId
+    compensation:
+      stepNumber: 1
+      stepName: compensate-create-order
+      providerName: order-service
+      tasks:
+        - taskOrder: 1
+          taskName: cancel-order
+          taskType: HTTP
+          taskConfig:
+            endpoint: /api/orders/cancel
+            method: POST
+          requestPayload:
+            payload:
+              orderId: $.steps[0].tasks[0].responsePayload.orderId
+              reason: BusinessProcess compensation
+  - stepNumber: 2
+    stepName: price-order
+    providerName: pricing-service
+    tasks:
+      - taskOrder: 1
+        taskName: get-price-book
+        taskType: HTTP
+        taskConfig:
+          endpoint: /api/pricing/price-books/{priceBookId}
+          method: GET
+        requestPayload:
+          payload:
+            priceBookId: $.initialPayload.priceBookId
+      - taskOrder: 2
+        taskName: calculate-price
+        taskType: HTTP
+        taskConfig:
+          endpoint: /api/pricing/calculate
+          method: POST
+        requestPayload:
+          payload:
+            orderId: $.steps[0].tasks[0].responsePayload.orderId
+            items: $.initialPayload.items
+  - stepNumber: 3
+    stepName: authorize-payment
+    providerName: payment-service
+    failurePolicy:
+      action: COMPENSATE_AND_STOP
+      retryable: true
+    tasks:
+      - taskOrder: 1
+        taskName: authorize-payment
+        taskType: HTTP
+        taskConfig:
+          endpoint: /api/payments/authorize
+          method: POST
+        requestPayload:
+          payload:
+            orderId: $.steps[0].tasks[0].responsePayload.orderId
+            amount: $.steps[1].tasks[1].responsePayload.totalAmount
+    compensation:
+      stepNumber: 1
+      stepName: compensate-authorize-payment
+      providerName: payment-service
+      tasks:
+        - taskOrder: 1
+          taskName: void-authorization
+          taskType: HTTP
+          taskConfig:
+            endpoint: /api/payments/authorizations/void
+            method: POST
+          requestPayload:
+            payload:
+              authorizationId: $.steps[2].tasks[0].responsePayload.authorizationId
+              orderId: $.steps[0].tasks[0].responsePayload.orderId
+  - stepNumber: 4
+    stepName: capture-payment
+    providerName: payment-service
+    failurePolicy:
+      action: COMPENSATE_AND_STOP
+      retryable: true
+    tasks:
+      - taskOrder: 1
+        taskName: capture-payment
+        taskType: HTTP
+        taskConfig:
+          endpoint: /api/payments/capture
+          method: POST
+        requestPayload:
+          payload:
+            orderId: $.steps[0].tasks[0].responsePayload.orderId
+            authorizationId: $.steps[2].tasks[0].responsePayload.authorizationId
+            amount: $.steps[1].tasks[1].responsePayload.totalAmount
+    compensation:
+      stepNumber: 1
+      stepName: compensate-capture-payment
+      providerName: payment-service
+      tasks:
+        - taskOrder: 1
+          taskName: refund-payment
+          taskType: HTTP
+          taskConfig:
+            endpoint: /api/payments/refund
+            method: POST
+          requestPayload:
+            payload:
+              captureId: $.steps[3].tasks[0].responsePayload.captureId
+              orderId: $.steps[0].tasks[0].responsePayload.orderId
+              amount: $.steps[1].tasks[1].responsePayload.totalAmount

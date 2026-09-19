@@ -13,7 +13,9 @@ import com.businessprocess.engine.engine.BusinessProcessMonitor;
 import com.businessprocess.engine.model.BusinessProcessDefinition;
 import com.businessprocess.engine.service.BusinessProcessOrchestrationService;
 import com.businessprocess.businessprocess.persistence.entity.BusinessProcessDefinitionEntity;
-import com.businessprocess.businessprocess.persistence.service.BusinessProcessPersistenceService;
+import com.businessprocess.businessprocess.persistence.service.BusinessProcessDefinitionPersistence;
+import com.businessprocess.businessprocess.persistence.service.BusinessProcessExecutionPersistence;
+import com.businessprocess.businessprocess.persistence.service.BusinessProcessExecutionQuery;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -27,16 +29,22 @@ public class BusinessProcessController {
 
     private final BusinessProcessOrchestrationService orchestrationService;
     private final BusinessProcessMonitor businessProcessMonitor;
-    private final BusinessProcessPersistenceService businessProcessPersistenceService;
+    private final BusinessProcessDefinitionPersistence definitionPersistence;
+    private final BusinessProcessExecutionPersistence executionPersistence;
+    private final BusinessProcessExecutionQuery executionQuery;
 
     public BusinessProcessController(
             BusinessProcessOrchestrationService orchestrationService,
             BusinessProcessMonitor businessProcessMonitor,
-            BusinessProcessPersistenceService businessProcessPersistenceService
+            BusinessProcessDefinitionPersistence definitionPersistence,
+            BusinessProcessExecutionPersistence executionPersistence,
+            BusinessProcessExecutionQuery executionQuery
     ) {
         this.orchestrationService = orchestrationService;
         this.businessProcessMonitor = businessProcessMonitor;
-        this.businessProcessPersistenceService = businessProcessPersistenceService;
+        this.definitionPersistence = definitionPersistence;
+        this.executionPersistence = executionPersistence;
+        this.executionQuery = executionQuery;
     }
 
     @PostMapping("/execute")
@@ -49,12 +57,12 @@ public class BusinessProcessController {
                 request.getBusinessProcessName(), correlationId);
 
         BusinessProcessDefinitionEntity businessProcessDefinition =
-                businessProcessPersistenceService.getBusinessProcessDefinition(request.getBusinessProcessName());
+                definitionPersistence.getDefinition(request.getBusinessProcessName());
         BusinessProcessDefinition businessProcess = orchestrationService.parseBusinessProcessTemplate(businessProcessDefinition.getBusinessProcessTemplate());
         String processKey = businessProcessDefinition.getBusinessProcessName();
 
         BusinessProcessExecution execution = orchestrationService.executeBusinessProcessflow(businessProcess, payload(request.getInputPayload()));
-        businessProcessPersistenceService.saveBusinessProcessExecution(
+        executionPersistence.save(
                 execution,
                 businessProcessDefinition,
                 processKey,
@@ -98,7 +106,7 @@ public class BusinessProcessController {
     public ResponseEntity<BusinessProcessExecutionDetailsResponse> getExecutionDetails(
             @RequestBody BusinessProcessExecutionDetailsRequest request
     ) {
-        var details = businessProcessPersistenceService.getBusinessProcessExecutionDetails(
+        var details = executionQuery.getDetails(
                 request.getBusinessProcessName(),
                 request.getCorrelationId()
         );

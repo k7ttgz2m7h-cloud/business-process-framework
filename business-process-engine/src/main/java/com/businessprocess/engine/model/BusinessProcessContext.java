@@ -48,4 +48,14 @@ public class BusinessProcessContext {
     public boolean hasTaskOutput(String taskId) {
         return taskResults.containsKey(taskId);
     }
+
+    public void restoreOutputs(RestoredExecutionState restoredState) {
+        if (restoredState == null || restoredState.steps() == null) return;
+        restoredState.steps().forEach((stepId, step) -> {
+            if (step != null) {
+                if (step.stepOutput() != null) stepResults.put(stepId, (BasePayload) step.stepOutput());
+                if (step.taskOutputs() != null) step.taskOutputs().forEach((taskId, output) -> taskResults.put(taskId, (BasePayload) output));
+            }
+        });
+    }
 }

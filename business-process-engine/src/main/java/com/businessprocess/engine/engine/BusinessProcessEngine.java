@@ -4,6 +4,7 @@ import com.businessprocess.core.delegate.TaskDelegate;
 import com.businessprocess.core.model.audit.Audit;
 import com.businessprocess.core.model.base.BasePayload;
 import com.businessprocess.core.model.task.Task;
+import com.businessprocess.core.model.task.TaskStatus;
 import com.businessprocess.core.model.businessprocess.BusinessProcessStep;
 import com.businessprocess.core.model.businessprocess.BusinessProcessStepResult;
 import com.businessprocess.core.model.businessprocess.BusinessProcessStepStatus;
@@ -15,6 +16,8 @@ import com.businessprocess.core.util.CompensationExecutor;
 import com.businessprocess.engine.model.BusinessProcessContext;
 import com.businessprocess.engine.model.BusinessProcessDefinition;
 import com.businessprocess.engine.model.BusinessProcessStatus;
+import com.businessprocess.engine.model.RestoredExecutionState;
+import com.businessprocess.engine.model.RestoredStepState;
 import com.businessprocess.engine.parser.PayloadPathResolver;
 import com.businessprocess.businessprocess.discovery.BusinessProcessServiceDiscoveryClient;
 import com.businessprocess.businessprocess.discovery.BusinessProcessServiceEndpoint;
@@ -86,6 +89,88 @@ public class BusinessProcessEngine {
         }
     }
 
+    /**
+     * Starts a new execution and resumes at the requested step. Restored outputs
+     * are supplied by the persistence layer so downstream payload mappings remain valid.
+     */
+    public BusinessProcessExecution executeFrom(BusinessProcessDefinition businessProcess, BasePayload initialPayload,
+                                                 String stepId, String taskId,
+                                                 RestoredExecutionState restoredState) {
+        BusinessProcessContext context = new BusinessProcessContext(businessProcess);
+        context.setInitialPayload(initialPayload);
+        context.restoreOutputs(restoredState);
+        List<BusinessProcessStep> steps = businessProcess.getSteps();
+        int start = findResumeStepIndex(steps, stepId);
+        BusinessProcessStep resumeStep = resolveResumeStep(steps, start);
+        validateResumeTask(resumeStep, taskId);
+        restoreCompletedTasks(resumeStep, restoredState);
+        List<BusinessProcessStep> remaining = steps.subList(start, steps.size());
+        return executeRestored(remaining, context);
+    }
+
+    private BusinessProcessStep resolveResumeStep(List<BusinessProcessStep> steps, int start) {
+        return steps.get(start);
+    }
+
+    private void validateResumeTask(BusinessProcessStep resumeStep, String taskId) {
+        if (taskId == null) {
+            return;
+        }
+        if (resumeStep.getTasks().stream().noneMatch(task -> taskId.equals(task.getTaskId()))) {
+            throw new IllegalArgumentException("Resume task '" + taskId + "' not found in step '" + resumeStep.getStepId() + "'");
+        }
+    }
+
+    private int findResumeStepIndex(List<BusinessProcessStep> steps, String stepId) {
+        if (stepId == null) {
+            return 0;
+        }
+        for (int i = 0; i < steps.size(); i++) {
+            if (stepId.equals(steps.get(i).getStepId())) {
+                return i;
+            }
+        }
+        throw new IllegalArgumentException("Resume step '" + stepId + "' not found in business process definition");
+    }
+
+    private void restoreCompletedTasks(BusinessProcessStep resumeStep, RestoredExecutionState restoredState) {
+        if (restoredState == null || restoredState.steps() == null) {
+            return;
+        }
+        RestoredStepState stepState = restoredState.steps().get(resumeStep.getStepId());
+        if (stepState == null || stepState.taskStatuses() == null) {
+            return;
+        }
+        for (Task task : resumeStep.getTasks()) {
+            TaskStatus status = stepState.taskStatuses().get(task.getTaskId());
+            restoreCompletedTask(task, status, stepState);
+        }
+    }
+
+    private void restoreCompletedTask(Task task, TaskStatus status, RestoredStepState stepState) {
+        if (!TaskStatus.COMPLETED.equals(status)) {
+            return;
+        }
+        task.setStatus(TaskStatus.COMPLETED);
+        BasePayload<?> output = stepState.taskOutputs() != null ? stepState.taskOutputs().get(task.getTaskId()) : null;
+        if (output != null) {
+            task.setResponsePayload(output);
+        }
+    }
+
+    private BusinessProcessExecution executeRestored(List<BusinessProcessStep> steps, BusinessProcessContext context) {
+        Audit audit = new Audit();
+        context.setStatus(BusinessProcessStatus.IN_PROGRESS);
+        try {
+            BusinessProcessExecution result = executeBusinessProcess(steps, context, new ArrayList<>());
+            audit.complete(); result.setBusinessProcessAudit(audit); return result;
+        } catch (Exception exception) {
+            audit.complete();
+            BusinessProcessExecution failed = buildFailedExecution(context.getExecutionId(), exception.getMessage(), context);
+            failed.setBusinessProcessAudit(audit); return failed;
+        }
+    }
+
     // Main businessProcess control
 
     private BusinessProcessExecution executeBusinessProcess(List<BusinessProcessStep> steps, BusinessProcessContext context, List<BusinessProcessStep> completedSteps) {
@@ -139,10 +224,7 @@ public class BusinessProcessEngine {
         StringBuilder errorBuilder = new StringBuilder();
 
         try {
-            List<Task> tasks = step.getTasks();
-            for (int i = 0; i < tasks.size(); i++) {
-                executeTask(tasks.get(i), i, step, context, errorBuilder);
-            }
+            executePendingTasks(step, context, errorBuilder);
 
             if (!errorBuilder.isEmpty()) {
                 step.complete();
@@ -159,6 +241,26 @@ public class BusinessProcessEngine {
             step.complete();
             return buildStepFailureResult(step, errorMessage, context);
         }
+    }
+
+    private void executePendingTasks(BusinessProcessStep step, BusinessProcessContext context, StringBuilder errorBuilder) {
+        List<Task> tasks = step.getTasks();
+        for (int i = 0; i < tasks.size(); i++) {
+            Task task = tasks.get(i);
+            if (shouldSkipTask(task)) {
+                logRestoredTaskSkipped(task, context);
+                continue;
+            }
+            executeTask(task, i, step, context, errorBuilder);
+        }
+    }
+
+    private boolean shouldSkipTask(Task task) {
+        return TaskStatus.COMPLETED.equals(task.getStatus());
+    }
+
+    private void logRestoredTaskSkipped(Task task, BusinessProcessContext context) {
+        log.info("Skipping restored completed task: {}, executionId={}", task.getTaskId(), context.getExecutionId());
     }
 
     // Task execution

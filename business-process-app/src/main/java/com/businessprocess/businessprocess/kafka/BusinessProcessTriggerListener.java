@@ -7,7 +7,8 @@ import com.businessprocess.engine.model.BusinessProcessDefinition;
 import com.businessprocess.engine.service.BusinessProcessOrchestrationService;
 import com.businessprocess.businessprocess.api.dto.BusinessProcessTriggerMessage;
 import com.businessprocess.businessprocess.persistence.entity.BusinessProcessDefinitionEntity;
-import com.businessprocess.businessprocess.persistence.service.BusinessProcessPersistenceService;
+import com.businessprocess.businessprocess.persistence.service.BusinessProcessDefinitionPersistence;
+import com.businessprocess.businessprocess.persistence.service.BusinessProcessExecutionPersistence;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
@@ -19,16 +20,19 @@ import java.util.UUID;
 public class BusinessProcessTriggerListener {
     private final ObjectMapper objectMapper;
     private final BusinessProcessOrchestrationService orchestrationService;
-    private final BusinessProcessPersistenceService businessProcessPersistenceService;
+    private final BusinessProcessDefinitionPersistence definitionPersistence;
+    private final BusinessProcessExecutionPersistence executionPersistence;
 
     public BusinessProcessTriggerListener(
             ObjectMapper objectMapper,
             BusinessProcessOrchestrationService orchestrationService,
-            BusinessProcessPersistenceService businessProcessPersistenceService
+            BusinessProcessDefinitionPersistence definitionPersistence,
+            BusinessProcessExecutionPersistence executionPersistence
     ) {
         this.objectMapper = objectMapper;
         this.orchestrationService = orchestrationService;
-        this.businessProcessPersistenceService = businessProcessPersistenceService;
+        this.definitionPersistence = definitionPersistence;
+        this.executionPersistence = executionPersistence;
     }
 
     @KafkaListener(topics = "${saga.kafka.trigger-topic}", groupId = "${spring.kafka.consumer.group-id}")
@@ -42,7 +46,7 @@ public class BusinessProcessTriggerListener {
                 trigger.getBusinessProcessName(), correlationId);
 
         BusinessProcessDefinitionEntity businessProcessDefinition =
-                businessProcessPersistenceService.getBusinessProcessDefinition(trigger.getBusinessProcessName());
+                definitionPersistence.getDefinition(trigger.getBusinessProcessName());
         BusinessProcessDefinition businessProcess = orchestrationService.parseBusinessProcessTemplate(businessProcessDefinition.getBusinessProcessTemplate());
         String processKey = businessProcessDefinition.getBusinessProcessName();
 
@@ -50,7 +54,7 @@ public class BusinessProcessTriggerListener {
                 businessProcess,
                 payload(trigger.getInputPayload())
         );
-        businessProcessPersistenceService.saveBusinessProcessExecution(
+        executionPersistence.save(
                 execution,
                 businessProcessDefinition,
                 processKey,

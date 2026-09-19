@@ -1,0 +1,139 @@
+businessProcessName: order-dispatch-bp
+version: "1.0"
+steps:
+  - stepNumber: 1
+    stepName: create-order
+    providerName: order-service
+    failurePolicy:
+      action: COMPENSATE_AND_STOP
+      retryable: true
+    tasks:
+      - taskOrder: 1
+        taskName: create-order
+        taskType: HTTP
+        taskConfig:
+          endpoint: /api/orders
+          method: POST
+        requestPayload:
+          payload:
+            clientRequestId: $.initialPayload.clientRequestId
+            customerId: $.initialPayload.customerId
+    compensation:
+      stepNumber: 1
+      stepName: compensate-create-order
+      providerName: order-service
+      tasks:
+        - taskOrder: 1
+          taskName: cancel-order
+          taskType: HTTP
+          taskConfig:
+            endpoint: /api/orders/cancel
+            method: POST
+          requestPayload:
+            payload:
+              orderId: $.steps[0].tasks[0].responsePayload.orderId
+              reason: BusinessProcess compensation
+  - stepNumber: 2
+    stepName: reserve-inventory
+    providerName: inventory-service
+    failurePolicy:
+      action: COMPENSATE_AND_STOP
+      retryable: true
+    tasks:
+      - taskOrder: 1
+        taskName: reserve-inventory
+        taskType: HTTP
+        taskConfig:
+          endpoint: /api/inventory/reservations
+          method: POST
+        requestPayload:
+          payload:
+            orderId: $.steps[0].tasks[0].responsePayload.orderId
+            items: $.initialPayload.items
+    compensation:
+      stepNumber: 1
+      stepName: compensate-reserve-inventory
+      providerName: inventory-service
+      tasks:
+        - taskOrder: 1
+          taskName: release-inventory
+          taskType: HTTP
+          taskConfig:
+            endpoint: /api/inventory/reservations/{reservationId}/release
+            method: POST
+          requestPayload:
+            payload:
+              reservationId: $.steps[1].tasks[0].responsePayload.reservationId
+              orderId: $.steps[0].tasks[0].responsePayload.orderId
+  - stepNumber: 3
+    stepName: fulfill-order
+    providerName: fulfillment-service
+    failurePolicy:
+      action: COMPENSATE_AND_STOP
+      retryable: true
+    tasks:
+      - taskOrder: 1
+        taskName: create-fulfillment
+        taskType: HTTP
+        taskConfig:
+          endpoint: /api/fulfillment/requests
+          method: POST
+        requestPayload:
+          payload:
+            orderId: $.steps[0].tasks[0].responsePayload.orderId
+            reservationId: $.steps[1].tasks[0].responsePayload.reservationId
+    compensation:
+      stepNumber: 1
+      stepName: compensate-fulfill-order
+      providerName: fulfillment-service
+      tasks:
+        - taskOrder: 1
+          taskName: cancel-fulfillment
+          taskType: HTTP
+          taskConfig:
+            endpoint: /api/fulfillment/requests/{fulfillmentId}/cancel
+            method: POST
+          requestPayload:
+            payload:
+              fulfillmentId: $.steps[2].tasks[0].responsePayload.fulfillmentId
+              orderId: $.steps[0].tasks[0].responsePayload.orderId
+  - stepNumber: 4
+    stepName: arrange-shipment
+    providerName: shipping-service
+    failurePolicy:
+      action: COMPENSATE_AND_STOP
+      retryable: true
+    tasks:
+      - taskOrder: 1
+        taskName: get-shipping-options
+        taskType: HTTP
+        taskConfig:
+          endpoint: /api/shipments/options
+          method: GET
+      - taskOrder: 2
+        taskName: create-shipment
+        taskType: HTTP
+        taskConfig:
+          endpoint: /api/shipments
+          method: POST
+        requestPayload:
+          payload:
+            orderId: $.steps[0].tasks[0].responsePayload.orderId
+            fulfillmentId: $.steps[2].tasks[0].responsePayload.fulfillmentId
+            carrierCode: $.steps[3].tasks[0].responsePayload.recommendedCarrierCode
+            serviceLevel: $.steps[3].tasks[0].responsePayload.recommendedServiceLevel
+    compensation:
+      stepNumber: 1
+      stepName: compensate-arrange-shipment
+      providerName: shipping-service
+      tasks:
+        - taskOrder: 1
+          taskName: cancel-shipment
+          taskType: HTTP
+          taskConfig:
+            endpoint: /api/shipments/{shipmentId}/cancel
+            method: POST
+          requestPayload:
+            payload:
+              shipmentId: $.steps[3].tasks[1].responsePayload.shipmentId
+              orderId: $.steps[0].tasks[0].responsePayload.orderId

@@ -178,6 +178,7 @@ DDL:      update
 Business process templates are stored in the `business_process` table. Executions, steps, and tasks are stored in:
 
 ```text
+business_process
 business_process_execution
 business_process_step
 business_process_task
@@ -212,3 +213,47 @@ Password:
 - `business-process-app` resolves provider base URLs through `business-process-service-registry` at `http://localhost:8090`.
 - DB-backed business process storage, durable execution state, encrypted payload storage, and reprocessing are future runtime concerns.
 - Kafka is used as a business process trigger, not as a topic-per-step choreography model.
+
+## Additional test business processes
+
+`business-process-flows/` contains 10 YAML definitions. The startup loader discovers
+all `*.yaml` files in this folder; it has no configured definition-count limit.
+This does not establish a concurrent-execution capacity limit.
+
+The six additional scenarios use existing registered sample services:
+
+| Business process name | Steps | Scenario |
+| --- | --- | --- |
+| `customer-verification-bp` | 2 | Create an order, then fetch and verify its customer |
+| `order-quotation-bp` | 3 | Create an order, verify the customer, fetch a price book and calculate pricing |
+| `inventory-reservation-bp` | 3 | Create an order, verify the customer and reserve stock |
+| `payment-capture-bp` | 4 | Create an order, calculate pricing, authorize and capture payment |
+| `order-dispatch-bp` | 4 | Create an order, reserve stock, create fulfillment and arrange shipping |
+| `compact-order-bp` | 10 | Order creation through customer verification, inventory, pricing, payment authorization, fraud screening, fulfillment, shipping, capture and completion |
+
+These are independent test scenarios. Intermediate flows intentionally leave their
+successful orders/reservations/payments in the resulting state; compensation runs
+on applicable failures, not as cleanup after successful execution. They preserve
+the corresponding compensation definitions from the end-to-end flow.
+
+Start the registry, app, and each provider used by the selected scenario. Submit
+this request to `POST /api/businessprocessflow/execute`, substituting any name above:
+
+```json
+{
+  "businessProcessName": "compact-order-bp",
+  "inputPayload": {
+    "clientRequestId": "COMPACT-TEST-001",
+    "customerId": "CUST-1",
+    "priceBookId": "PB-1",
+    "items": [{"productId": "PROD-1", "quantity": 2}]
+  }
+}
+```
+
+Use a fresh `clientRequestId` for each independent run; sample providers can reject
+repeated authorizations, fulfillment requests, and shipments for the same order.
+Use customer/product/price-book identifiers present in the sample service data.
+For a failure-path check, run `inventory-reservation-bp` with a nonexistent
+`customerId`: customer lookup should fail after order creation and exercise order
+compensation. Inspect the existing execution-details API for the resulting state.

@@ -8,7 +8,7 @@ import java.util.Optional;
 
 public interface BusinessProcessExecutionRepository extends JpaRepository<BusinessProcessExecutionEntity, String>,
         JpaSpecificationExecutor<BusinessProcessExecutionEntity> {
-    Optional<BusinessProcessExecutionEntity> findByCorrelationId(String correlationId);
+    Optional<BusinessProcessExecutionEntity> findFirstByCorrelationIdOrderByStartedAtDescExecutionIdDesc(String correlationId);
 
-    Optional<BusinessProcessExecutionEntity> findByBusinessProcessNameAndCorrelationId(String businessProcessName, String correlationId);
+    Optional<BusinessProcessExecutionEntity> findFirstByBusinessProcessNameAndCorrelationIdOrderByStartedAtDescExecutionIdDesc(String businessProcessName, String correlationId);
 }

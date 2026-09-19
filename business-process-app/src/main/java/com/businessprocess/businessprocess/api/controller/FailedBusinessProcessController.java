@@ -3,7 +3,7 @@ package com.businessprocess.businessprocess.api.controller;
 import com.businessprocess.businessprocess.api.dto.FailedBusinessProcessSearchRequest;
 import com.businessprocess.businessprocess.api.dto.FailedBusinessProcessSearchResponse;
 import com.businessprocess.businessprocess.api.mapper.FailedBusinessProcessMapper;
-import com.businessprocess.businessprocess.persistence.service.BusinessProcessPersistenceService;
+import com.businessprocess.businessprocess.persistence.service.BusinessProcessExecutionQuery;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
@@ -20,7 +20,7 @@ import java.util.Set;
 @RestController
 @RequestMapping("/api/v1/operations/business-process-executions")
 public class FailedBusinessProcessController {
-    private final BusinessProcessPersistenceService persistenceService;
+    private final BusinessProcessExecutionQuery executionQuery;
     private final FailedBusinessProcessMapper mapper;
     private static final Map<String, String> SORT_FIELDS = Map.of(
             "failedAt", "completedAt",
@@ -31,10 +31,10 @@ public class FailedBusinessProcessController {
     );
 
     public FailedBusinessProcessController(
-            BusinessProcessPersistenceService persistenceService,
+            BusinessProcessExecutionQuery executionQuery,
             FailedBusinessProcessMapper mapper
     ) {
-        this.persistenceService = persistenceService;
+        this.executionQuery = executionQuery;
         this.mapper = mapper;
     }
 
@@ -49,7 +49,7 @@ public class FailedBusinessProcessController {
                 Sort.by(direction, SORT_FIELDS.get(search.getSortBy())));
 
         return ResponseEntity.ok(mapper.toResponse(
-                persistenceService.searchFailedBusinessProcessExecutions(
+                executionQuery.searchFailed(
                         search.getBusinessProcessName(),
                         search.getFailureTypes(),
                         pageable)));

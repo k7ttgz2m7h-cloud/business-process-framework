@@ -1,0 +1,59 @@
+businessProcessName: customer-verification-bp
+version: "1.0"
+steps:
+  - stepNumber: 1
+    stepName: create-order
+    providerName: order-service
+    failurePolicy:
+      action: COMPENSATE_AND_STOP
+      retryable: true
+    tasks:
+      - taskOrder: 1
+        taskName: create-order
+        taskType: HTTP
+        taskConfig:
+          endpoint: /api/orders
+          method: POST
+        requestPayload:
+          payload:
+            clientRequestId: $.initialPayload.clientRequestId
+            customerId: $.initialPayload.customerId
+    compensation:
+      stepNumber: 1
+      stepName: compensate-create-order
+      providerName: order-service
+      tasks:
+        - taskOrder: 1
+          taskName: cancel-order
+          taskType: HTTP
+          taskConfig:
+            endpoint: /api/orders/cancel
+            method: POST
+          requestPayload:
+            payload:
+              orderId: $.steps[0].tasks[0].responsePayload.orderId
+              reason: BusinessProcess compensation
+  - stepNumber: 2
+    stepName: verify-customer
+    providerName: customer-service
+    tasks:
+      - taskOrder: 1
+        taskName: get-customer
+        taskType: HTTP
+        taskConfig:
+          endpoint: /api/customers/{customerId}
+          method: GET
+        requestPayload:
+          payload:
+            customerId: $.initialPayload.customerId
+      - taskOrder: 2
+        taskName: verify-customer
+        taskType: HTTP
+        taskConfig:
+          endpoint: /api/customers/verify
+          method: POST
+        requestPayload:
+          payload:
+            customerId: $.steps[1].tasks[0].responsePayload.customerId
+            orderId: $.steps[0].tasks[0].responsePayload.orderId
+            status: $.steps[1].tasks[0].responsePayload.status

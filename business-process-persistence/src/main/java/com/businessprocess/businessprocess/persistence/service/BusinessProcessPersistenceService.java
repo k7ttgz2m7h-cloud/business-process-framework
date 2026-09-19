@@ -200,7 +200,7 @@ public class BusinessProcessPersistenceService {
     @Transactional(readOnly = true)
     public BusinessProcessExecutionDetails getBusinessProcessExecutionDetails(String businessProcessName, String correlationId) {
         BusinessProcessExecutionEntity execution = businessProcessExecutionRepository
-                .findByBusinessProcessNameAndCorrelationId(businessProcessName, correlationId)
+                .findFirstByBusinessProcessNameAndCorrelationIdOrderByStartedAtDescExecutionIdDesc(businessProcessName, correlationId)
                 .orElseThrow(() -> new IllegalArgumentException(
                         "Business process execution not found for process name '" + businessProcessName
                                 + "' and correlation id '" + correlationId + "'"));
@@ -211,9 +211,19 @@ public class BusinessProcessPersistenceService {
     @Transactional(readOnly = true)
     public BusinessProcessExecutionDetails getBusinessProcessExecutionDetails(String correlationId) {
         BusinessProcessExecutionEntity execution = businessProcessExecutionRepository
-                .findByCorrelationId(correlationId)
+                .findFirstByCorrelationIdOrderByStartedAtDescExecutionIdDesc(correlationId)
                 .orElseThrow(() -> new IllegalArgumentException(
                         "Business process execution not found for correlation id '" + correlationId + "'"));
+
+        return toExecutionDetails(execution);
+    }
+
+    @Transactional(readOnly = true)
+    public BusinessProcessExecutionDetails getBusinessProcessExecutionDetailsByExecutionId(String executionId) {
+        BusinessProcessExecutionEntity execution = businessProcessExecutionRepository
+                .findById(executionId)
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "Business process execution not found for execution id '" + executionId + "'"));
 
         return toExecutionDetails(execution);
     }

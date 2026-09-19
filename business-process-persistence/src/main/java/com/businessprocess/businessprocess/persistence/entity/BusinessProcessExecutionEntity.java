@@ -13,7 +13,6 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.Lob;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
-import jakarta.persistence.UniqueConstraint;
 import java.time.LocalDateTime;
 
 @Getter
@@ -21,9 +20,9 @@ import java.time.LocalDateTime;
 @Entity
 @Table(
         name = "business_process_execution",
-        uniqueConstraints = @UniqueConstraint(name = "uk_business_process_execution_correlation", columnNames = {"business_process_name", "correlation_id"}),
         indexes = {
                 @Index(name = "idx_business_process_execution_name", columnList = "business_process_name"),
+                @Index(name = "idx_business_process_execution_correlation", columnList = "business_process_name, correlation_id"),
                 @Index(name = "idx_business_process_execution_failure", columnList = "status, failure_type, completed_at")
         }
 )

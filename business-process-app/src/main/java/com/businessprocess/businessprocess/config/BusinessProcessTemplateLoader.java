@@ -2,7 +2,7 @@ package com.businessprocess.businessprocess.config;
 
 import com.businessprocess.engine.model.BusinessProcessDefinition;
 import com.businessprocess.engine.service.BusinessProcessOrchestrationService;
-import com.businessprocess.businessprocess.persistence.service.BusinessProcessPersistenceService;
+import com.businessprocess.businessprocess.persistence.service.BusinessProcessDefinitionPersistence;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
@@ -20,14 +20,14 @@ public class BusinessProcessTemplateLoader implements ApplicationRunner {
     private static final String BUSINESS_PROCESS_FLOW_PATTERN = "classpath*:/business-process-flows/*.yaml";
 
     private final BusinessProcessOrchestrationService orchestrationService;
-    private final BusinessProcessPersistenceService businessProcessPersistenceService;
+    private final BusinessProcessDefinitionPersistence businessProcessDefinitionPersistence;
 
     public BusinessProcessTemplateLoader(
             BusinessProcessOrchestrationService orchestrationService,
-            BusinessProcessPersistenceService businessProcessPersistenceService
+            BusinessProcessDefinitionPersistence businessProcessDefinitionPersistence
     ) {
         this.orchestrationService = orchestrationService;
-        this.businessProcessPersistenceService = businessProcessPersistenceService;
+        this.businessProcessDefinitionPersistence = businessProcessDefinitionPersistence;
     }
 
     @Override
@@ -37,7 +37,7 @@ public class BusinessProcessTemplateLoader implements ApplicationRunner {
             String template = new String(resource.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
             BusinessProcessDefinition businessProcess = orchestrationService.parseBusinessProcessTemplate(template);
             String businessProcessName = resolveBusinessProcessName(template, businessProcess);
-            businessProcessPersistenceService.saveBusinessProcessTemplate(businessProcess, businessProcessName, template);
+            businessProcessDefinitionPersistence.saveBusinessProcessTemplate(businessProcess, businessProcessName, template);
             log.info("Loaded businessProcess template: processName={}, resource={}", businessProcessName, resource.getFilename());
         }
     }
