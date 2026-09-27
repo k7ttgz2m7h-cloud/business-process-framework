@@ -32,3 +32,16 @@ saga:
   service-discovery:
     registry-base-url: http://localhost:8090
     cache-ttl: 120s
+
+logging:
+  file:
+    name: ${STEPFLOW_LOG_DIR:../temp/stepflow-logs}/${spring.application.name}.json
+  structured:
+    format:
+      file: ecs
+  logback:
+    rollingpolicy:
+      file-name-pattern: ${logging.file.name}.%d{yyyy-MM-dd}.%i
+      max-file-size: 10MB
+      max-history: 7
+      total-size-cap: 100MB

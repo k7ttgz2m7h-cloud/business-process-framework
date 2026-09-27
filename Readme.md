@@ -257,3 +257,151 @@ Use customer/product/price-book identifiers present in the sample service data.
 For a failure-path check, run `inventory-reservation-bp` with a nonexistent
 `customerId`: customer lookup should fail after order creation and exercise order
 compensation. Inspect the existing execution-details API for the resulting state.
+
+## ECS logging with Elasticsearch and Kibana
+
+The framework, registry, and all nine sample services write one ECS (Elastic
+Common Schema) JSON object per log line. Fields include `@timestamp`,
+`service.name`, `log.level`, and `message`. Console logs remain readable.
+One shared Logstash instance collects the files and sends them to daily
+Elasticsearch indices named `stepflow-logs-YYYY.MM.dd`.
+
+### Application log location
+
+Before starting applications, source the environment script in Bash from the
+`business-process-framework` directory:
+
+```bash
+source ./stepflow-env.sh
+```
+
+It derives `<stepflow>/temp/stepflow-logs` from the checkout location, without
+hardcoding a machine path. An existing `STEPFLOW_LOG_DIR` override is preserved.
+The sample-services `start-all.sh` sets this location automatically. For IDE
+launches, set `STEPFLOW_LOG_DIR` to the same absolute directory in each run
+configuration. Restart applications after changing their logging environment.
+
+The default layout is:
+
+```text
+stepflow/
+├── business-process-framework/
+│   └── logstash.conf
+└── temp/
+    └── stepflow-logs/
+        ├── business-process-manager.json
+        ├── business-process-service-registry.json
+        ├── payment-service.json
+        └── ...
+```
+
+### Start Logstash with Docker
+
+Start Docker Desktop, Elasticsearch, and Kibana first. Logstash runs separately
+from the applications. The following command uses Logstash **9.5.4**, matching
+the Elasticsearch version used in this setup, and assumes Elasticsearch is
+exposed on the Mac at `http://localhost:9200`.
+
+Configure Elasticsearch authentication in the `elasticsearch` output block of
+[logstash.conf](logstash.conf). Use credentials with permission to write the log
+indices; keep passwords out of Git. For environment-based credentials, use:
+
+```text
+user => "${ELASTICSEARCH_USERNAME}"
+password => "${ELASTICSEARCH_PASSWORD}"
+```
+
+Export those variables locally and add `-e ELASTICSEARCH_USERNAME` and
+`-e ELASTICSEARCH_PASSWORD` to the Docker command when using that configuration.
+For HTTPS, also configure the trusted CA certificate in the pipeline, mount it
+into the container, and change `ELASTICSEARCH_URL` to the HTTPS endpoint.
+
+Run from **`business-process-framework`**:
+
+```bash
+docker run --rm --name stepflow-logstash \
+  --mount "type=bind,source=$PWD/logstash.conf,target=/usr/share/logstash/pipeline/logstash.conf,readonly" \
+  --mount "type=bind,source=$(cd .. && pwd)/temp/stepflow-logs,target=/stepflow-logs,readonly" \
+  --mount "type=volume,source=stepflow-logstash-data,target=/usr/share/logstash/data" \
+  -e STEPFLOW_LOG_DIR=/stepflow-logs \
+  -e ELASTICSEARCH_URL=http://host.docker.internal:9200 \
+  docker.elastic.co/logstash/logstash:9.5.4
+```
+
+The host source folder must exist and contain the JSON files directly. If you
+use a custom application log directory, replace the source folder in the mount.
+Mount `temp/stepflow-logs`, not its parent `temp`; otherwise the files appear one
+level below the path Logstash watches. `temp` and `tmp` are different directories.
+Inside Docker, `host.docker.internal` addresses the Mac; `localhost` addresses
+the Logstash container itself.
+
+Leave the command running. `--rm` removes the container when it stops, so rerun
+the command for the next session. The named data volume preserves file read
+positions: previously unseen files are read from the beginning; after restarts,
+Logstash resumes from saved offsets and continues watching for new entries.
+
+To run in the background and restart with Docker, replace
+`docker run --rm --name stepflow-logstash` with
+`docker run -d --restart unless-stopped --name stepflow-logstash` when creating
+the container. Stop any existing instance first. A manually stopped persistent
+container can be started with `docker start stepflow-logstash`.
+
+### Verify ingestion and create a Kibana data view
+
+In another terminal, check the collector and its mounted files:
+
+```bash
+docker logs --tail 100 stepflow-logstash
+docker exec stepflow-logstash sh -c 'ls -lh /stepflow-logs/*.json'
+```
+
+Open Kibana at `http://127.0.0.1:5601`. In **Dev Tools → Console**, run:
+
+```http
+GET _cat/indices/stepflow-logs-*?v
+```
+
+Wait for an index with a nonzero `docs.count`. Container log output alone does
+not confirm successful ingestion.
+
+1. Find **Data Views** through Kibana's global search, or open the data view
+   dropdown in **Discover**.
+2. Select **Create data view** and enter:
+   - **Name:** `Stepflow Logs`
+   - **Index pattern:** `stepflow-logs-*` (without quotes or backticks)
+   - **Timestamp field:** `@timestamp`
+3. Save the data view, open **Discover**, and select **Stepflow Logs**.
+4. Set the time range to include application startup. Add `@timestamp`,
+   `service.name`, `log.level`, and `message` as columns.
+
+### Search service and Tomcat logs
+
+Use **KQL** mode in Discover. For Tomcat startup in one service:
+
+```text
+service.name: "payment-service" AND message: "Tomcat started"
+```
+
+For Tomcat startup across all services:
+
+```text
+message: "Tomcat started"
+```
+
+For all framework application logs:
+
+```text
+service.name: "business-process-manager"
+```
+
+For errors across every service:
+
+```text
+log.level: "ERROR"
+```
+
+### Troubleshooting
+hard-refresh
+  the browser or try a private window. If it persists, restart the Kibana
+  container and reload after startup. This is a browser asset-loading failure,
+  not an Elasticsearch search timeout.

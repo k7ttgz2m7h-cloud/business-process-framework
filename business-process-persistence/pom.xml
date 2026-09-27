@@ -15,6 +15,11 @@
 
     <dependencies>
         <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <optional>true</optional>
+        </dependency>
+        <dependency>
             <groupId>com.businessprocess</groupId>
             <artifactId>business-process-core</artifactId>
         </dependency>
